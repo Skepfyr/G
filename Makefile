@@ -1,7 +1,7 @@
 CC=gcc
 
 IDIR =./include
-CFLAGS=-I$(IDIR)
+local_CFLAGS=-I$(IDIR)
 
 ODIR=output
 _OBJ = GIn.o
@@ -13,7 +13,7 @@ SRC = src/*.c
 .SILENT: GIn clean
 
 GIn:
-	 $(CC)  -o $(OBJ) $(SRC) $(CFLAGS)
+	$(CC)  -o $(OBJ) $(SRC) $(CFLAGS) $(local_CFLAGS)
 
 clean:
 	rm -f $(ODIR)/GIn.o

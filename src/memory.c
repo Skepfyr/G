@@ -19,11 +19,11 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
         collectGarbage();
 #endif
     }
-    
-    if (vm.bytesAllocated > vm.nextGC) {
+
+    if (!vm.doingGC && vm.bytesAllocated > vm.nextGC) {
         collectGarbage();
     }
-    
+
     if (newSize == 0) {
         free(pointer);
         return NULL;
@@ -50,7 +50,7 @@ void markObject(Obj* object) {
 #endif
 
     object->isMarked = true;
-    
+
     if (vm.grayCapacity < vm.grayCount + 1) {
         vm.grayCapacity = GROW_CAPACITY(vm.grayCapacity);
         vm.grayStack = (Obj**)realloc(vm.grayStack,
@@ -59,7 +59,7 @@ void markObject(Obj* object) {
             exit(1);
         }
     }
-    
+
     vm.grayStack[vm.grayCount++] = object;
 }
 
@@ -188,17 +188,17 @@ static void markRoots() {
     for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
         markValue(*slot);
     }
-    
+
     for (int i = 0; i < vm.frameCount; i++) {
         markObject((Obj*)vm.frames[i].closure);
     }
-    
+
     for (ObjUpvalue* upvalue = vm.openUpvalues;
          upvalue != NULL;
          upvalue = upvalue->next) {
         markObject((Obj*)upvalue);
     }
-    
+
     markTable(&vm.globals);
     markCompilerRoots();
 }
@@ -228,7 +228,7 @@ static void sweep() {
             else {
                 vm.objects = object;
             }
-        
+
             freeObject(unreached);
         }
     }
@@ -239,13 +239,15 @@ void collectGarbage() {
     printf("-- gc begin\n");
     size_t before = vm.bytesAllocated;
 #endif
+    vm.doingGC = true;
 
     markRoots();
     traceReferences();
     tableRemoveWhite(&vm.strings);
     sweep();
-    
+
     vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;
+    vm.doingGC = false;
 
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");
@@ -262,6 +264,6 @@ void freeObjects() {
         freeObject(object);
         object = next;
     }
-    
+
     free(vm.grayStack);
 }

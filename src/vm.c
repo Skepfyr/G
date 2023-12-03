@@ -29,7 +29,7 @@ static void runtimeError(const char* format, ...) {
     vfprintf(stderr, format, args);
     va_end(args);
     fputs("\n", stderr);
-    
+
     for (int i = vm.frameCount - 1; i >= 0; i--) {
         CallFrame* frame = &vm.frames[i];
         ObjFunction* function = frame->closure->function;
@@ -54,7 +54,7 @@ static Value lengthNative(int argCount, Value* args) {
         return NIL_VAL;
     }
     ObjList* list = AS_LIST(args[0]);
-    
+
     return NUMBER_VAL(list->count);
 }
 
@@ -98,10 +98,14 @@ static Value strToListNative(int argCount, Value* args) {
     int len = AS_STRING(args[0])->length;
 
     ObjList* list = newList();
+    push(OBJ_VAL(list));
     for (int ii=0; ii < len; ii++) {
         ObjString* char_as_string = copyString(&cstring[ii], 1);
+        push(OBJ_VAL(char_as_string));
         appendToList(list, OBJ_VAL(char_as_string));
+        pop();
     }
+    pop();
     return OBJ_VAL(list);
 }
 
@@ -118,14 +122,14 @@ void initVM() {
     vm.objects = NULL;
     vm.bytesAllocated = 0;
     vm.nextGC = 1024 * 1024;
-    
+
     vm.grayCount = 0;
     vm.grayCapacity = 0;
     vm.grayStack = NULL;
-    
+
     initTable(&vm.globals);
     initTable(&vm.strings);
-    
+
     defineNative("clock", clockNative);
     defineNative("length", lengthNative);
     defineNative("append", appendNative);
@@ -159,7 +163,7 @@ static bool call(ObjClosure* closure, int argCount) {
             closure->function->arity, argCount);
         return false;
     }
-    
+
     if (vm.frameCount == FRAMES_MAX) {
         runtimeError("Stack overflow.");
         return false;
@@ -169,7 +173,7 @@ static bool call(ObjClosure* closure, int argCount) {
     frame->closure = closure;
     frame->ip = closure->function->chunk.code;
     frame->slots = vm.stackTop - argCount - 1;
-    return true;    
+    return true;
 }
 
 static bool callValue(Value callee, int argCount) {
@@ -208,7 +212,7 @@ static bool bindMethod(ObjClass* klass, ObjString* name) {
         runtimeError("Undefined property '%s'.", name->chars);
         return false;
     }
-    
+
     ObjBoundMethod* bound = newBoundMethod(peek(0),
                                            AS_CLOSURE(method));
     pop();
@@ -223,14 +227,14 @@ static ObjUpvalue* captureUpvalue(Value* local) {
         prevUpvalue = upvalue;
         upvalue = upvalue->next;
     }
-    
+
     if (upvalue != NULL && upvalue->location == local) {
         return upvalue;
     }
-    
+
     ObjUpvalue* createdUpvalue = newUpvalue(local);
     createdUpvalue->next = upvalue;
-    
+
     if (prevUpvalue == NULL) {
         vm.openUpvalues = createdUpvalue;
     }
@@ -264,13 +268,13 @@ static bool isFalsey(Value value) {
 static void concatenate() {
     ObjString* b = AS_STRING(peek(0));
     ObjString* a = AS_STRING(peek(1));
-    
+
     int length = a->length + b->length;
     char* chars = ALLOCATE(char, length + 1);
     memcpy(chars, a->chars, a->length);
     memcpy(chars + a->length, b->chars, b->length);
     chars[length] = '\0';
-    
+
     ObjString* result = takeString(chars, length);
     pop();
     pop();
@@ -382,7 +386,7 @@ static InterpretResult run() {
                     runtimeError("Only instances have properties.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                
+
                 ObjInstance* instance = AS_INSTANCE(peek(0));
                 ObjString* name = READ_STRING();
 
@@ -514,7 +518,7 @@ static InterpretResult run() {
                     pop();
                     return INTERPRET_OK;
                 }
-                
+
                 vm.stackTop = frame->slots;
                 push(result);
                 frame = &vm.frames[vm.frameCount - 1];
@@ -553,24 +557,24 @@ static InterpretResult run() {
                 Value indexVal = pop();
                 Value listVal = pop();
                 Value result;
-                
+
                 if (!IS_LIST(listVal)) {
                     runtimeError("Cannot index into something that's not a list.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 ObjList* list = AS_LIST(listVal);
-                
+
                 if (!IS_NUMBER(indexVal)) {
                     runtimeError("List index is not a number.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 int index = AS_NUMBER(indexVal);
-                
+
                 if (!isValidListIndex(list, index)) {
                     runtimeError("List index out of range.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                
+
                 result = indexFromList(list, index);
                 push(result);
                 break;
@@ -582,24 +586,24 @@ static InterpretResult run() {
                 Value item = pop();
                 Value indexVal = pop();
                 Value listVal = pop();
-                
+
                 if (!IS_LIST(listVal)) {
                     runtimeError("Cannot store value in something that's not a list.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 ObjList* list = AS_LIST(listVal);
-                
+
                 if (!IS_NUMBER(indexVal)) {
                     runtimeError("List index is not a number.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 int index = AS_NUMBER(indexVal);
-                
+
                 if (!isValidListIndex(list, index)) {
                     runtimeError("List index out of range.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                
+
                 storeToList(list, index, item);
                 push(item);
                 break;
@@ -618,7 +622,7 @@ InterpretResult interpret(const char* source) {
     if (function == NULL) {
         return INTERPRET_COMPILE_ERROR;
     }
-    
+
     push(OBJ_VAL(function));
     ObjClosure* closure = newClosure(function);
     pop();
