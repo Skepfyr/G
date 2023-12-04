@@ -18,10 +18,10 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 #ifdef DEBUG_STRESS_GC
         collectGarbage();
 #endif
-    }
 
-    if (!vm.doingGC && vm.bytesAllocated > vm.nextGC) {
-        collectGarbage();
+        if (vm.bytesAllocated > vm.nextGC) {
+            collectGarbage();
+        }
     }
 
     if (newSize == 0) {
@@ -239,7 +239,6 @@ void collectGarbage() {
     printf("-- gc begin\n");
     size_t before = vm.bytesAllocated;
 #endif
-    vm.doingGC = true;
 
     markRoots();
     traceReferences();
@@ -247,7 +246,6 @@ void collectGarbage() {
     sweep();
 
     vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;
-    vm.doingGC = false;
 
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");
