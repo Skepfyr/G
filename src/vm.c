@@ -483,7 +483,7 @@ static InterpretResult run() {
                 break;
             }
             case OP_CALL: {
-                int argCount = READ_BYTE();
+                int argCount = READ_SHORT();
                 if (!callValue(peek(argCount), argCount)) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
@@ -535,7 +535,7 @@ static InterpretResult run() {
                 // Start with all the list items on the stack
                 // Result: just the list on the stack
                 ObjList* list = newList();
-                uint8_t itemCount = READ_BYTE();  // list length is an operand
+                uint16_t itemCount = READ_SHORT();  // list length is an operand
 
                 push(OBJ_VAL(list));  // So it's not swept up by the GC during appendToList
                 for (int i = itemCount; i > 0; i--) {

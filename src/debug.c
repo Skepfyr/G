@@ -111,7 +111,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
         case OP_LOOP:
             return jumpInstruction("OP_LOOP", -1, chunk, offset);
         case OP_CALL:
-            return byteInstruction("OP_CALL", chunk, offset);
+            return shortInstruction("OP_CALL", chunk, offset);
         case OP_CLOSURE: {
             offset++;
             uint16_t constant = chunk->code[offset++] << 8;
@@ -141,7 +141,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
             return constantInstruction("OP_METHOD", chunk, offset);
         // GCH - implement these properly
         case OP_BUILD_LIST:
-            return simpleInstruction("OP_BUILD_LIST", offset);
+            return shortInstruction("OP_BUILD_LIST", chunk, offset);
         case OP_INDEX_SUBSCR:
             return simpleInstruction("OP_INDEX_SUBSCR", offset);
         case OP_STORE_SUBSCR:

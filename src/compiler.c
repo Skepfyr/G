@@ -367,8 +367,8 @@ static void declareVariable() {
     addLocal(*name);
 }
 
-static uint8_t argumentList() {
-    uint8_t argCount = 0;
+static uint16_t argumentList() {
+    uint16_t argCount = 0;
     if (!check(TOKEN_RIGHT_PAREN)) {
         do {
             expression();
@@ -425,7 +425,8 @@ static void binary(bool canAssign) {
 
 static void call(bool canAssign) {
     uint8_t argCount = argumentList();
-    emitBytes(OP_CALL, argCount);
+    emitByte(OP_CALL);
+    emitShort(argCount);
 }
 
 static void dot(bool canAssign) {
@@ -572,7 +573,7 @@ static void list(bool canAssign) {
     consume(TOKEN_RIGHT_BRACKET, "Expect ']' after list literal.");
 
     emitByte(OP_BUILD_LIST);
-    emitByte(itemCount);
+    emitShort(itemCount);
 }
 
 static void subscript(bool canAssign) {
@@ -769,14 +770,14 @@ static void classDeclaration() {
 }
 
 static void funDeclaration() {
-    uint8_t global = parseVariable("Expect function name.");
+    uint16_t global = parseVariable("Expect function name.");
     markInitialized();
     function(TYPE_FUNCTION);
     defineVariable(global);
 }
 
 static void varDeclaration() {
-    uint8_t global = parseVariable("Expect variable name.");
+    uint16_t global = parseVariable("Expect variable name.");
 
     if (match(TOKEN_EQUAL)) {
         expression();
