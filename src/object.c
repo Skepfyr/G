@@ -15,7 +15,7 @@ static Obj* allocateObject(size_t size, ObjType type) {
     Obj* object = (Obj*)reallocate(NULL, 0, size);
     object->type = type;
     object->isMarked = false;
-    
+
     object->next = vm.objects;
     vm.objects = object;
 
@@ -81,6 +81,7 @@ ObjList* newList() {
     list->items = NULL;
     list->count = 0;
     list->capacity = 0;
+    return list;
 }
 
 void appendToList(ObjList* list, Value value) {
@@ -122,7 +123,7 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
     string->length = length;
     string->chars = chars;
     string->hash = hash;
-    
+
     push(OBJ_VAL(string));
     tableSet(&vm.strings, string, NIL_VAL);
     pop();
@@ -142,7 +143,7 @@ static uint32_t hashString(const char* key, int length) {
 ObjString* takeString(char* chars, int length) {
     uint32_t hash = hashString(chars, length);
     ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
-    
+
     if (interned != NULL) {
         FREE_ARRAY(char, chars, length + 1);
         return interned;

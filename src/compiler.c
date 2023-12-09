@@ -48,7 +48,7 @@ typedef struct {
 } Local;
 
 typedef struct {
-    uint8_t index;
+    uint16_t index;
     bool isLocal;
 } Upvalue;
 
@@ -151,6 +151,11 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
     emitByte(byte2);
 }
 
+static void emitShort(uint16_t val) {
+    emitByte((val >> 8) & 0xff);
+    emitByte(val & 0xff);
+}
+
 static void emitLoop(int loopStart) {
     emitByte(OP_LOOP);
 
@@ -159,8 +164,7 @@ static void emitLoop(int loopStart) {
         error("Loop body too large.");
     }
 
-    emitByte((offset >> 8) & 0xff);
-    emitByte(offset & 0xff);
+    emitShort((uint16_t)offset);
 }
 
 static int emitJump(uint8_t instruction) {
@@ -175,17 +179,18 @@ static void emitReturn() {
     emitByte(OP_RETURN);
 }
 
-static uint8_t makeConstant(Value value) {
+static uint16_t makeConstant(Value value) {
     int constant = addConstant(currentChunk(), value);
-    if (constant > UINT8_MAX) {
+    if (constant > UINT16_MAX) {
       error("Too many constants in one chunk.");
       return 0;
     }
-    return (uint8_t)constant;
+    return (uint16_t)constant;
 }
 
 static void emitConstant(Value value) {
-    emitBytes(OP_CONSTANT, makeConstant(value));
+    emitByte(OP_CONSTANT);
+    emitShort(makeConstant(value));
 }
 
 static void patchJump(int  offset) {
@@ -267,7 +272,7 @@ static void parsePrecedence(Precedence precedence);
 // Take the lexeme from the token and add it to the chunk's constant table,
 // as a string. Return the index of that constant in the table, so the VM
 // can access the variable's name at runtime (by its index).
-static uint8_t identifierConstant(Token* name) {
+static uint16_t identifierConstant(Token* name) {
     return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
 }
 
@@ -292,7 +297,7 @@ static int resolveLocal(Compiler* compiler, Token* name) {
     return -1;
 }
 
-static int addUpvalue(Compiler* compiler, uint8_t index, bool isLocal) {
+static int addUpvalue(Compiler* compiler, uint16_t index, bool isLocal) {
     int upvalueCount = compiler->function->upvalueCount;
 
     for (int i = 0; i < upvalueCount; i++) {
@@ -320,12 +325,12 @@ static int resolveUpvalue(Compiler* compiler, Token* name) {
     int local = resolveLocal(compiler->enclosing, name);
     if (local != -1) {
         compiler->enclosing->locals[local].isCaptured = true;
-        return addUpvalue(compiler, (uint8_t)local, true);
+        return addUpvalue(compiler, (uint16_t)local, true);
     }
 
     int upvalue = resolveUpvalue(compiler->enclosing, name);
     if (upvalue != -1) {
-        return addUpvalue(compiler, (uint8_t)upvalue, false);
+        return addUpvalue(compiler, (uint16_t)upvalue, false);
     }
 
     return -1;
@@ -425,15 +430,16 @@ static void call(bool canAssign) {
 
 static void dot(bool canAssign) {
     consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
-    uint8_t name = identifierConstant(&parser.previous);
+    uint16_t name = identifierConstant(&parser.previous);
 
     if (canAssign && match(TOKEN_EQUAL)) {
         expression();
-        emitBytes(OP_SET_PROPERTY, name);
+        emitByte(OP_SET_PROPERTY);
     }
     else {
-        emitBytes(OP_GET_PROPERTY, name);
+        emitByte(OP_GET_PROPERTY);
     }
+    emitShort(name);
 }
 
 static void literal(bool canAssign) {
@@ -507,11 +513,12 @@ static void namedVariable(Token name, bool canAssign) {
 
     if (canAssign && match(TOKEN_EQUAL)) {
         expression();
-        emitBytes(setOp, (uint8_t)arg);
+        emitByte(setOp);
     }
     else {
-        emitBytes(getOp, (uint8_t)arg);
+        emitByte(getOp);
     }
+    emitShort(arg);
 }
 
 static void variable(bool canAssign) {
@@ -650,7 +657,7 @@ static void parsePrecedence(Precedence precedence) {
     }
 }
 
-static uint8_t parseVariable(const char* errorMessage) {
+static uint16_t parseVariable(const char* errorMessage) {
     consume(TOKEN_IDENTIFIER, errorMessage);
 
     declareVariable();
@@ -668,13 +675,14 @@ static void markInitialized() {
     current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
-static void defineVariable(uint8_t global) {
+static void defineVariable(uint16_t global) {
     if (current->scopeDepth > 0) {
         markInitialized();
         return;
     }
 
-    emitBytes(OP_DEFINE_GLOBAL, global);
+    emitByte(OP_DEFINE_GLOBAL);
+    emitShort(global);
 }
 
 static ParseRule* getRule(TokenType type) {
@@ -706,7 +714,7 @@ static void function(FunctionType type) {
             if (current->function->arity > 65535) {
                 errorAtCurrent("Can't have more than 65535 parameters.");
             }
-            uint8_t constant = parseVariable("Expect parameter name.");
+            uint16_t constant = parseVariable("Expect parameter name.");
             defineVariable(constant);
         } while (match(TOKEN_COMMA));
     }
@@ -716,30 +724,33 @@ static void function(FunctionType type) {
     block();
 
     ObjFunction* function = endCompiler();
-    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+    emitByte(OP_CLOSURE);
+    emitShort(makeConstant(OBJ_VAL(function)));
 
     for (int i = 0; i < function->upvalueCount; i++) {
         emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
-        emitByte(compiler.upvalues[i].index);
+        emitShort(compiler.upvalues[i].index);
     }
 }
 
 static void method() {
     consume(TOKEN_IDENTIFIER, "Expect method name.");
-    uint8_t constant = identifierConstant(&parser.previous);
+    uint16_t constant = identifierConstant(&parser.previous);
 
     FunctionType type = TYPE_METHOD;
     function(type);
-    emitBytes(OP_METHOD, constant);
+    emitByte(OP_METHOD);
+    emitShort(constant);
 }
 
 static void classDeclaration() {
     consume(TOKEN_IDENTIFIER, "Expect class name.");
     Token className = parser.previous;
-    uint8_t nameConstant = identifierConstant(&parser.previous);
+    uint16_t nameConstant = identifierConstant(&parser.previous);
     declareVariable();
 
-    emitBytes(OP_CLASS, nameConstant);
+    emitByte(OP_CLASS);
+    emitShort(nameConstant);
     defineVariable(nameConstant);
 
     ClassCompiler classCompiler;

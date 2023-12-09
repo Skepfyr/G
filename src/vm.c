@@ -290,7 +290,7 @@ static InterpretResult run() {
     (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8 | frame->ip[-1])))
 
 #define READ_CONSTANT() \
-    (frame->closure->function->chunk.constants.values[READ_BYTE()])
+    (frame->closure->function->chunk.constants.values[READ_SHORT()])
 
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 
@@ -337,12 +337,12 @@ static InterpretResult run() {
                 pop();
                 break;
             case OP_GET_LOCAL: {
-                uint8_t slot = READ_BYTE();
+                uint16_t slot = READ_SHORT();
                 push(frame->slots[slot]);
                 break;
             }
             case OP_SET_LOCAL: {
-                uint8_t slot = READ_BYTE();
+                uint16_t slot = READ_SHORT();
                 frame->slots[slot] = peek(0);
                 break;
             }
@@ -372,12 +372,12 @@ static InterpretResult run() {
                 break;
             }
             case OP_GET_UPVALUE: {
-                uint8_t slot = READ_BYTE();
+                uint16_t slot = READ_SHORT();
                 push(*frame->closure->upvalues[slot]->location);
                 break;
             }
             case OP_SET_UPVALUE: {
-                uint8_t slot = READ_BYTE();
+                uint16_t slot = READ_SHORT();
                 *frame->closure->upvalues[slot]->location = peek(0);
                 break;
             }
@@ -496,7 +496,7 @@ static InterpretResult run() {
                 push(OBJ_VAL(closure));
                 for (int i = 0; i < closure->upvalueCount; i++) {
                     uint8_t isLocal = READ_BYTE();
-                    uint8_t index = READ_BYTE();
+                    uint8_t index = READ_SHORT();
                     if (isLocal) {
                         closure->upvalues[i] = captureUpvalue(frame->slots + index);
                     }
