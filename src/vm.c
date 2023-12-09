@@ -496,7 +496,7 @@ static InterpretResult run() {
                 push(OBJ_VAL(closure));
                 for (int i = 0; i < closure->upvalueCount; i++) {
                     uint8_t isLocal = READ_BYTE();
-                    uint8_t index = READ_SHORT();
+                    uint16_t index = READ_SHORT();
                     if (isLocal) {
                         closure->upvalues[i] = captureUpvalue(frame->slots + index);
                     }
